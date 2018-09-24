@@ -9,7 +9,7 @@ use indy::wallet::Wallet;
 
 use indy::ErrorCode;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::panic;
 use std::sync::mpsc::channel;
 use std::time::Duration;
@@ -18,7 +18,7 @@ mod utils;
 
 use utils::{export_config_json, export_path};
 use utils::constants::{DEFAULT_CREDENTIALS, INVALID_HANDLE};
-use utils::file::TempDir;
+use utils::file::{TempDir, TempFile};
 use utils::rand;
 
 const VALID_TIMEOUT: Duration = Duration::from_secs(5);
@@ -53,6 +53,18 @@ mod wallet_config {
                 "path": path.as_ref().to_str()
             }
         }).to_string()
+    }
+
+    pub mod export {
+        use super::*;
+        
+        #[inline]
+        pub fn new<P: AsRef<Path>>(path: P, key: &str) -> String {
+            json!({
+                "path": path.as_ref(),
+                "key": key
+            }).to_string()
+        }
     }
 }
 
@@ -761,5 +773,168 @@ mod test_wallet_close {
     fn close_wallet_timeout_timeouts() {
         let result = Wallet::close_timeout(INVALID_HANDLE, INVALID_TIMEOUT);
         assert_eq!(ErrorCode::CommonIOError, result.unwrap_err());
+    }
+}
+
+#[cfg(test)]
+mod test_wallet_export {
+    use super::*;
+
+    pub const EXPORT_KEY: &str = "TheScythesHangInTheAppleTrees";
+
+    pub fn export_wallet_config() -> (String, PathBuf, TempDir) {
+        let dir = TempDir::new(None).unwrap();
+        let path = dir.as_ref().join("wallet_export");
+        let config = wallet_config::export::new(&path, EXPORT_KEY);
+
+        (config, path, dir)
+    }
+
+    #[test]
+    fn export_wallet() {
+        let config_wallet = wallet_config::new();
+        let (config_export, path, _dir) = export_wallet_config();
+
+        Wallet::create(&config_wallet, DEFAULT_CREDENTIALS).unwrap();
+        let handle = Wallet::open(&config_wallet, DEFAULT_CREDENTIALS).unwrap();
+
+        let result = Wallet::export(handle, &config_export);
+
+        assert_eq!((), result.unwrap());
+        
+        assert!(path.exists());
+
+        Wallet::close(handle).unwrap();
+        Wallet::delete(&config_wallet, DEFAULT_CREDENTIALS).unwrap();
+    }
+
+    #[test]
+    fn export_wallet_path_already_exists() {
+        let config_wallet = wallet_config::new();
+        let file = TempFile::new(None).unwrap();
+        let config_export = wallet_config::export::new(&file, EXPORT_KEY);
+
+        Wallet::create(&config_wallet, DEFAULT_CREDENTIALS).unwrap();
+        let handle = Wallet::open(&config_wallet, DEFAULT_CREDENTIALS).unwrap();
+
+        let result = Wallet::export(handle, &config_export);
+
+        assert_eq!(ErrorCode::CommonIOError, result.unwrap_err());
+        
+        Wallet::close(handle).unwrap();
+        Wallet::delete(&config_wallet, DEFAULT_CREDENTIALS).unwrap();
+    }
+
+    #[test]
+    fn export_wallet_invalid_config() {
+        let config_wallet = wallet_config::new();
+        Wallet::create(&config_wallet, DEFAULT_CREDENTIALS).unwrap();
+        let handle = Wallet::open(&config_wallet, DEFAULT_CREDENTIALS).unwrap();
+
+        let result = Wallet::export(handle, "{}");
+
+        assert_eq!(ErrorCode::CommonInvalidStructure, result.unwrap_err());
+
+        Wallet::close(handle).unwrap();
+        Wallet::delete(&config_wallet, DEFAULT_CREDENTIALS).unwrap();
+    }
+
+    #[test]
+    fn export_wallet_invalid_handle() {
+        let (config_export, path, _dir) = export_wallet_config();
+
+        let result = Wallet::export(INVALID_HANDLE, &config_export);
+        assert_eq!(ErrorCode::WalletInvalidHandle, result.unwrap_err());
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn export_wallet_async() {
+        let (sender, receiver) = channel();
+        let config_wallet = wallet_config::new();
+        let (config_export, path, _dir) = export_wallet_config();
+
+        Wallet::create(&config_wallet, DEFAULT_CREDENTIALS).unwrap();
+        let handle = Wallet::open(&config_wallet, DEFAULT_CREDENTIALS).unwrap();
+
+        Wallet::export_async(
+            handle,
+            &config_export,
+            move |ec| sender.send(ec).unwrap()
+        );
+
+        let ec = receiver.recv_timeout(VALID_TIMEOUT).unwrap();
+
+        assert_eq!(ErrorCode::Success, ec);
+        assert!(path.exists());
+
+        Wallet::close(handle).unwrap();
+        Wallet::delete(&config_wallet, DEFAULT_CREDENTIALS).unwrap();
+    }
+
+    #[test]
+    fn export_wallet_async_invalid_handle() {
+        let (sender, receiver) = channel();
+        let (config_export, path, _dir) = export_wallet_config();
+
+        Wallet::export_async(
+            INVALID_HANDLE,
+            &config_export,
+            move |ec| sender.send(ec).unwrap()
+        );
+
+        let ec = receiver.recv_timeout(VALID_TIMEOUT).unwrap();
+
+        assert_eq!(ErrorCode::WalletInvalidHandle, ec);
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn export_wallet_timeout() {
+        let config_wallet = wallet_config::new();
+        let (config_export, path, _dir) = export_wallet_config();
+
+        Wallet::create(&config_wallet, DEFAULT_CREDENTIALS).unwrap();
+        let handle = Wallet::open(&config_wallet, DEFAULT_CREDENTIALS).unwrap();
+
+        let result = Wallet::export_timeout(
+            handle,
+            &config_export,
+            VALID_TIMEOUT
+        );
+
+        assert_eq!((), result.unwrap());
+        assert!(path.exists());
+
+        Wallet::close(handle).unwrap();
+        Wallet::delete(&config_wallet, DEFAULT_CREDENTIALS).unwrap();
+    }
+
+    #[test]
+    fn export_wallet_timeout_invalid_handle() {
+        let (config_export, path, _dir) = export_wallet_config();
+
+        let result = Wallet::export_timeout(
+            INVALID_HANDLE,
+            &config_export,
+            VALID_TIMEOUT
+        );
+
+        assert_eq!(ErrorCode::WalletInvalidHandle, result.unwrap_err());
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn export_wallet_timeout_timeouts() {
+        let (config_export, path, _dir) = export_wallet_config();
+
+        let result = Wallet::export_timeout(
+            INVALID_HANDLE,
+            &config_export,
+            INVALID_TIMEOUT
+        );
+
+        assert_eq!(ErrorCode::CommonIOError, result.unwrap_err());
+        assert!(!path.exists());
     }
 }
