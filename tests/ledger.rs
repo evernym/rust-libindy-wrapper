@@ -32,7 +32,8 @@ mod test_sign_and_submit_request {
                                        "type":"1",
                                        "dest":"VsKV7grR1BUE29mG2Fm2kX",
                                        "verkey":"GjZWsBLgZCR18aL468JAT7w9CZRiBnpxUPPgyQxh4voa"
-                                       }
+                                       },
+                                  "protocolVersion":2
                               }"#;
 
 
@@ -51,7 +52,6 @@ mod test_sign_and_submit_request {
         let pool_handle = indy::pool::Pool::open_ledger(&setup.pool_name, None).unwrap();
         let (did, verkey) = Did::new(wallet.handle, "{}").unwrap();
 
-
         let result = indy::ledger::Ledger::sign_and_submit_request(pool_handle, wallet.handle, &did, REQUEST_JSON);
 
         let mut response : String = "".to_string();
@@ -64,6 +64,36 @@ mod test_sign_and_submit_request {
         indy::pool::Pool::close(pool_handle).unwrap();
 
         assert!(false, "response {:?}", response);
+
+        /*
+         * The format of SignAndSubmitRequestAsync response is like this.
+         *
+            {"result":{
+                "reqSignature":{
+                    "type":"ED25519",
+                    "values":[{"value":"7kDrVBrmrKAvSs1QoQWYq6F774ZN3bRXx5e3aaUFiNvmh4F1yNqQw1951Az35nfrnGjZ99vtCmSFXZ5GqS1zLiG","from":"V4SGRU86Z58d6TV7PBUe6f"}]
+                },
+                "txnMetadata":{
+                    "txnTime":1536876204,
+                    "seqNo":36,
+                    "txnId":"5d38ac6a242239c97ee28884c2b5cadec62248b2256bce51afd814c7847a853e"
+                },
+                "ver":"1",
+                "auditPath":["DATtzSu9AMrArv8C2oribQh4wJ6TaD2K9o76t7EL2N7G","AbGuM7s9MudnT8M2eZe1yaG2EGUGxggMXSSbXCm4DFDx","3fjMoUdsbNrRfG5ZneHaQuX994oA4Z2pYPZtRRPmkngw"],
+                "rootHash":"A9LirjLuoBT59JJTJYvUgfQyEJA32Wb7njrbD9XqT2wc",
+                "txn":{
+                    "data":{
+                        "dest":"KQRpY4EmSG4MwH7md8gMoN","verkey":"B2nW4JfqZ2omHksoCmwD8zXXmtBsvbQk6WVSboazd8QB"
+                    },
+                    "protocolVersion":2,
+                    "type":"1",
+                    "metadata":{
+                        "digest":"14594e0b31f751faf72d4bf4abdc6f54af34dab855fe1a0c67fe651b47bb93b5","reqId":1536876205519496000,"from":"V4SGRU86Z58d6TV7PBUe6f"
+                    }
+                }
+            },
+            "op":"REPLY"}
+        */
     }
 
     #[test]
@@ -113,12 +143,16 @@ mod test_sign_and_submit_request {
 
         let result = indy::ledger::Ledger::sign_and_submit_request_timeout(pool_handle, wallet.handle, &did, REQUEST_JSON, VALID_TIMEOUT);
 
+        let mut response : String = "".to_string();
+
         match result {
-            Ok(str) => {},
+            Ok(stuff) => { response = stuff; },
             Err(ec) => { assert!(false, "sign_and_submit_request_timeout_success got error code {:?}", ec); },
         }
 
         indy::pool::Pool::close(pool_handle).unwrap();
+
+        assert!(false, "response {:?}", response);
 
     }
 
