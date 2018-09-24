@@ -38,6 +38,35 @@ mod test_sign_and_submit_request {
 
 
     #[test]
+    pub fn this_crashes() {
+        indy::pool::Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
+
+        let wallet = utils::wallet::Wallet::new();
+        let setup = Setup::new(&wallet, SetupConfig {
+            connect_to_pool: false,
+            num_trustees: 0,
+            num_nodes: 4,
+            num_users: 0,
+        });
+
+        let pool_handle = indy::pool::Pool::open_ledger(&setup.pool_name, None).unwrap();
+        let (did, verkey) = Did::new(wallet.handle, "{}").unwrap();
+
+        let result = indy::ledger::Ledger::sign_and_submit_request(pool_handle, wallet.handle, &did, "{}");
+
+        let mut response : String = "".to_string();
+
+        match result {
+            Ok(return_response) => { response = return_response; },
+            Err(ec) => { assert!(false, "sign_and_submit_request_success got error code {:?}", ec); },
+        }
+
+        indy::pool::Pool::close(pool_handle).unwrap();
+
+        assert!(false, "response {:?}", response);
+    }
+
+    #[test]
     pub fn sign_and_submit_request_success() {
         indy::pool::Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
 
