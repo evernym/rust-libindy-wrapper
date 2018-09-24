@@ -17,12 +17,13 @@ use std::time::Duration;
 mod utils;
 
 use utils::{export_config_json, export_path};
-use utils::constants::{DEFAULT_CREDENTIALS, INVALID_HANDLE};
+use utils::constants::{DEFAULT_CREDENTIALS, INVALID_HANDLE, METADATA};
 use utils::file::{TempDir, TempFile};
 use utils::rand;
 
 const VALID_TIMEOUT: Duration = Duration::from_secs(5);
 const INVALID_TIMEOUT: Duration = Duration::from_micros(1);
+const EXPORT_KEY: &str = "TheScythesHangInTheAppleTrees";
 
 
 
@@ -64,6 +65,14 @@ mod wallet_config {
                 "path": path.as_ref(),
                 "key": key
             }).to_string()
+        }
+
+        pub fn with_defaults() -> (String, PathBuf, TempDir) {
+            let dir = TempDir::new(None).unwrap();
+            let path = dir.as_ref().join("wallet_export");
+            let config = wallet_config::export::new(&path, EXPORT_KEY);
+
+            (config, path, dir)
         }
     }
 }
@@ -780,20 +789,10 @@ mod test_wallet_close {
 mod test_wallet_export {
     use super::*;
 
-    pub const EXPORT_KEY: &str = "TheScythesHangInTheAppleTrees";
-
-    pub fn export_wallet_config() -> (String, PathBuf, TempDir) {
-        let dir = TempDir::new(None).unwrap();
-        let path = dir.as_ref().join("wallet_export");
-        let config = wallet_config::export::new(&path, EXPORT_KEY);
-
-        (config, path, dir)
-    }
-
     #[test]
     fn export_wallet() {
         let config_wallet = wallet_config::new();
-        let (config_export, path, _dir) = export_wallet_config();
+        let (config_export, path, _dir) = wallet_config::export::with_defaults();
 
         Wallet::create(&config_wallet, DEFAULT_CREDENTIALS).unwrap();
         let handle = Wallet::open(&config_wallet, DEFAULT_CREDENTIALS).unwrap();
@@ -841,7 +840,7 @@ mod test_wallet_export {
 
     #[test]
     fn export_wallet_invalid_handle() {
-        let (config_export, path, _dir) = export_wallet_config();
+        let (config_export, path, _dir) = wallet_config::export::with_defaults();
 
         let result = Wallet::export(INVALID_HANDLE, &config_export);
         assert_eq!(ErrorCode::WalletInvalidHandle, result.unwrap_err());
@@ -852,7 +851,7 @@ mod test_wallet_export {
     fn export_wallet_async() {
         let (sender, receiver) = channel();
         let config_wallet = wallet_config::new();
-        let (config_export, path, _dir) = export_wallet_config();
+        let (config_export, path, _dir) = wallet_config::export::with_defaults();
 
         Wallet::create(&config_wallet, DEFAULT_CREDENTIALS).unwrap();
         let handle = Wallet::open(&config_wallet, DEFAULT_CREDENTIALS).unwrap();
@@ -875,7 +874,7 @@ mod test_wallet_export {
     #[test]
     fn export_wallet_async_invalid_handle() {
         let (sender, receiver) = channel();
-        let (config_export, path, _dir) = export_wallet_config();
+        let (config_export, path, _dir) = wallet_config::export::with_defaults();
 
         Wallet::export_async(
             INVALID_HANDLE,
@@ -892,7 +891,7 @@ mod test_wallet_export {
     #[test]
     fn export_wallet_timeout() {
         let config_wallet = wallet_config::new();
-        let (config_export, path, _dir) = export_wallet_config();
+        let (config_export, path, _dir) = wallet_config::export::with_defaults();
 
         Wallet::create(&config_wallet, DEFAULT_CREDENTIALS).unwrap();
         let handle = Wallet::open(&config_wallet, DEFAULT_CREDENTIALS).unwrap();
@@ -912,7 +911,7 @@ mod test_wallet_export {
 
     #[test]
     fn export_wallet_timeout_invalid_handle() {
-        let (config_export, path, _dir) = export_wallet_config();
+        let (config_export, path, _dir) = wallet_config::export::with_defaults();
 
         let result = Wallet::export_timeout(
             INVALID_HANDLE,
@@ -926,7 +925,7 @@ mod test_wallet_export {
 
     #[test]
     fn export_wallet_timeout_timeouts() {
-        let (config_export, path, _dir) = export_wallet_config();
+        let (config_export, path, _dir) = wallet_config::export::with_defaults();
 
         let result = Wallet::export_timeout(
             INVALID_HANDLE,
@@ -936,5 +935,132 @@ mod test_wallet_export {
 
         assert_eq!(ErrorCode::CommonIOError, result.unwrap_err());
         assert!(!path.exists());
+    }
+}
+
+#[cfg(test)]
+mod test_wallet_import {
+    use super::*;
+
+    fn setup_exported_wallet(
+        config_wallet: &str,
+        credentials: &str,
+        config_export: &str
+    ) -> (String, String) {
+        Wallet::create(&config_wallet, credentials).unwrap();
+        let handle = Wallet::open(&config_wallet, credentials).unwrap();
+
+        let (did, _) = Did::new(handle, "{}").unwrap();
+        Did::set_metadata(handle, &did, METADATA).unwrap();
+        let did_with_metadata = Did::get_metadata(handle, &did).unwrap();
+
+        Wallet::export(handle, &config_export).unwrap();
+
+        Wallet::close(handle).unwrap();
+        Wallet::delete(&config_wallet, DEFAULT_CREDENTIALS).unwrap();
+
+        (did, did_with_metadata)
+    }
+
+    #[test]
+    fn import_wallet() {
+        let config_wallet = wallet_config::new();
+        let (config_export, _path, _dir) = wallet_config::export::with_defaults();
+        let (did, did_with_metadata) = setup_exported_wallet(
+            &config_wallet,
+            DEFAULT_CREDENTIALS,
+            &config_export
+        );
+
+        let result = Wallet::import(
+            &config_wallet,
+            DEFAULT_CREDENTIALS,
+            &config_export
+        );
+
+        assert_eq!((), result.unwrap());
+
+        let handle = Wallet::open(&config_wallet, DEFAULT_CREDENTIALS).unwrap();
+
+        let imported_did_with_metadata = Did::get_metadata(handle, &did).unwrap();
+
+        assert_eq!(did_with_metadata, imported_did_with_metadata);
+
+        Wallet::close(handle).unwrap();
+        Wallet::delete(&config_wallet, DEFAULT_CREDENTIALS).unwrap();
+    }
+
+    #[test]
+    fn import_wallet_invalid_path() {
+        let config_wallet = wallet_config::new();
+        let non_existant_path = Path::new("PlaceWithoutWindOrWords");
+        let config_export = wallet_config::export::new(
+            &non_existant_path,
+            EXPORT_KEY
+        );
+
+        let result = Wallet::import(
+            &config_wallet,
+            DEFAULT_CREDENTIALS,
+            &config_export
+        );
+
+        assert_eq!(ErrorCode::CommonIOError, result.unwrap_err());
+
+        let result = Wallet::open(&config_wallet, DEFAULT_CREDENTIALS);
+        assert_eq!(ErrorCode::WalletNotFoundError, result.unwrap_err());
+    }
+
+    #[test]
+    fn import_wallet_invalid_config() {
+        let config_wallet = wallet_config::new();
+
+        let result = Wallet::import(&config_wallet, DEFAULT_CREDENTIALS, "{}");
+
+        assert_eq!(ErrorCode::CommonInvalidStructure, result.unwrap_err());
+    }
+
+    #[test]
+    fn import_wallet_invalid_key() {
+        let config_wallet = wallet_config::new();
+        let (config_export, path, _dir) = wallet_config::export::with_defaults();
+        setup_exported_wallet(
+            &config_wallet,
+            DEFAULT_CREDENTIALS,
+            &config_export
+        );
+
+        let config_import = wallet_config::export::new(path, "bad_key");
+
+        let result = Wallet::import(
+            &config_wallet,
+            DEFAULT_CREDENTIALS,
+            &config_import
+        );
+
+        assert_eq!(ErrorCode::CommonInvalidStructure, result.unwrap_err());
+    }
+
+    #[test]
+    fn import_wallet_duplicate_name() {
+        let config_wallet = wallet_config::new();
+        let (config_export, _path, _dir) = wallet_config::export::with_defaults();
+        setup_exported_wallet(
+            &config_wallet,
+            DEFAULT_CREDENTIALS,
+            &config_export
+        );
+
+        Wallet::create(&config_wallet, DEFAULT_CREDENTIALS).unwrap();
+
+        let result = Wallet::import(
+            &config_wallet,
+            DEFAULT_CREDENTIALS,
+            &config_export
+        );
+
+        assert_eq!(ErrorCode::WalletAlreadyExistsError, result.unwrap_err());
+
+        Wallet::delete(&config_wallet, DEFAULT_CREDENTIALS);
     }
 }
