@@ -17,7 +17,7 @@ use std::time::Duration;
 mod utils;
 
 use utils::{export_config_json, export_path};
-use utils::constants::DEFAULT_CREDENTIALS;
+use utils::constants::{DEFAULT_CREDENTIALS, INVALID_HANDLE};
 use utils::file::TempDir;
 use utils::rand;
 
@@ -669,6 +669,97 @@ mod test_wallet_open {
             INVALID_TIMEOUT
         );
 
+        assert_eq!(ErrorCode::CommonIOError, result.unwrap_err());
+    }
+}
+
+#[cfg(test)]
+mod test_wallet_close {
+    use super::*;
+    
+    #[test]
+    fn close_wallet() {
+        let config = wallet_config::new();
+        Wallet::create(&config, DEFAULT_CREDENTIALS).unwrap();
+        let handle = Wallet::open(&config, DEFAULT_CREDENTIALS).unwrap();
+
+        let result = Wallet::close(handle);
+
+        assert_eq!((), result.unwrap());
+    }
+
+    // #[test]
+    // fn close_wallet_registered() {
+    //     unimplemented!();
+    // }
+
+    #[test]
+    fn close_wallet_invalid_handle() {
+        let result = Wallet::close(INVALID_HANDLE);
+        assert_eq!(ErrorCode::WalletInvalidHandle, result.unwrap_err());
+    }
+
+    #[test]
+    fn close_wallet_duplicate_command() {
+        let config = wallet_config::new();
+        Wallet::create(&config, DEFAULT_CREDENTIALS).unwrap();
+        let handle = Wallet::open(&config, DEFAULT_CREDENTIALS).unwrap();
+
+        let result = Wallet::close(handle);
+
+        assert_eq!((), result.unwrap());
+
+        let result = Wallet::close(handle);
+
+        assert_eq!(ErrorCode::WalletInvalidHandle, result.unwrap_err());
+    }
+
+    #[test]
+    fn close_wallet_async() {
+        let (sender, receiver) = channel();
+        let config = wallet_config::new();
+
+        Wallet::create(&config, DEFAULT_CREDENTIALS).unwrap();
+        let handle = Wallet::open(&config, DEFAULT_CREDENTIALS).unwrap();
+
+        Wallet::close_async(handle, move |ec| sender.send(ec).unwrap());
+
+        let ec = receiver.recv_timeout(VALID_TIMEOUT).unwrap();
+
+        assert_eq!(ErrorCode::Success, ec);
+    }
+
+    #[test]
+    fn close_wallet_async_invalid_handle() {
+        let (sender, receiver) = channel();
+
+        Wallet::close_async(INVALID_HANDLE, move |ec| sender.send(ec).unwrap());
+
+        let ec = receiver.recv_timeout(VALID_TIMEOUT).unwrap();
+
+        assert_eq!(ErrorCode::WalletInvalidHandle, ec);
+    }
+
+    #[test]
+    fn close_wallet_timeout() {
+        let config = wallet_config::new();
+        Wallet::create(&config, DEFAULT_CREDENTIALS).unwrap();
+        let handle = Wallet::open(&config, DEFAULT_CREDENTIALS).unwrap();
+
+        let result = Wallet::close_timeout(handle, VALID_TIMEOUT);
+
+        assert_eq!((), result.unwrap());
+    }
+
+    #[test]
+    fn close_wallet_timeout_invalid_handle() {
+        let result = Wallet::close_timeout(INVALID_HANDLE, VALID_TIMEOUT);
+        assert_eq!(ErrorCode::WalletInvalidHandle, result.unwrap_err());
+    }
+
+    #[test]
+    fn close_wallet_timeout_timeouts() {
+        let result = Wallet::close_timeout(INVALID_HANDLE, INVALID_TIMEOUT);
         assert_eq!(ErrorCode::CommonIOError, result.unwrap_err());
     }
 }
