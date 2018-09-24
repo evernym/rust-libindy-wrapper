@@ -2,7 +2,6 @@ pub const DEFAULT_CREDENTIALS: &str = r#"{"key":""}"#;
 pub const DID_1: &str = "VsKV7grR1BUE29mG2Fm2kX";
 pub const DID: &str = "8wZcEriaNLNKtteJvx7f8i";
 pub const DID_TRUSTEE: &str = "V4SGRU86Z58d6TV7PBUe6f";
-pub const EXPORT_KEY: &str = "export_key";
 pub const INVALID_HANDLE: i32 = 583741;
 pub const METADATA: &str = "some_metadata";
 pub const MY1_SEED: &str = "00000000000000000000000000000My1";

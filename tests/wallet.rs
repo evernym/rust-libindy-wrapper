@@ -16,7 +16,6 @@ use std::time::Duration;
 
 mod utils;
 
-use utils::{export_config_json, export_path};
 use utils::constants::{DEFAULT_CREDENTIALS, INVALID_HANDLE, METADATA};
 use utils::file::{TempDir, TempFile};
 use utils::rand;
@@ -78,88 +77,6 @@ mod wallet_config {
 }
 
 
-#[cfg(test)]
-mod wallet_tests {
-    use super::*;
-
-    #[test]
-    fn create_delete_wallet_works() {
-        let wallet_name = r#"{"id":"create_delete_wallet_works"}"#;
-        match Wallet::create(wallet_name, DEFAULT_CREDENTIALS) {
-            Ok(..) => assert!(Wallet::delete(wallet_name, DEFAULT_CREDENTIALS).is_ok()),
-            Err(e) => match e {
-                ErrorCode::WalletAlreadyExistsError => {
-                    //This is ok, just delete
-                    assert!(Wallet::delete(wallet_name, DEFAULT_CREDENTIALS).is_ok())
-                }
-                _ => {
-                    panic!("{:#?}", e)
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn open_close_wallet_works() {
-        let wallet_name = r#"{"id":"open_wallet_works"}"#;
-        let open_closure = || {
-            match Wallet::open(wallet_name, DEFAULT_CREDENTIALS) {
-                Ok(handle) => {
-                    Wallet::close(handle).unwrap();
-                    Wallet::delete(wallet_name, DEFAULT_CREDENTIALS).unwrap();
-                },
-                Err(e) => {
-                    Wallet::delete(wallet_name, DEFAULT_CREDENTIALS).unwrap();
-                    panic!("{:#?}", e);
-                }
-            }
-        };
-
-        match Wallet::create(wallet_name, DEFAULT_CREDENTIALS) {
-            Err(e) => match e {
-                ErrorCode::WalletAlreadyExistsError => {
-                    open_closure()
-                }
-                _ => panic!("{:#?}", e)
-            }
-            _ => open_closure()
-        };
-    }
-
-    #[test]
-    fn export_import_wallet_works() {
-        let wallet_name = r#"{"id":"export_import_wallet_works"}"#;
-
-        let open_closure = || {
-            match Wallet::open(wallet_name, DEFAULT_CREDENTIALS) {
-                Ok(handle) => {
-                    Did::new(handle, "{}").unwrap();
-
-                    Wallet::export(handle, &export_config_json(wallet_name)).unwrap();
-
-                    assert!(Path::new(&export_path(wallet_name)).exists());
-
-                    Wallet::close(handle).unwrap();
-                    Wallet::delete(wallet_name, DEFAULT_CREDENTIALS).unwrap();
-                },
-                Err(e) => {
-                    Wallet::delete(wallet_name, DEFAULT_CREDENTIALS).unwrap();
-                    panic!("{:#?}", e);
-                }
-            }
-        };
-
-        match Wallet::create(wallet_name, DEFAULT_CREDENTIALS) {
-            Err(e) => match e {
-                ErrorCode::WalletAlreadyExistsError => {
-                    open_closure()
-                }
-                _ => panic!("{:#?}", e)
-            }
-            _ => open_closure()
-        };
-    }
-}
 
 #[cfg(test)]
 mod test_wallet_register {
@@ -1061,6 +978,6 @@ mod test_wallet_import {
 
         assert_eq!(ErrorCode::WalletAlreadyExistsError, result.unwrap_err());
 
-        Wallet::delete(&config_wallet, DEFAULT_CREDENTIALS);
+        Wallet::delete(&config_wallet, DEFAULT_CREDENTIALS).unwrap();
     }
 }
