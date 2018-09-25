@@ -37,7 +37,10 @@ mod test_sign_and_submit_request {
                               }"#;
 
 
+    // the purpose of this test is to show a crash, it should not be part of the regular
+    // tests
     #[test]
+    #[ignore]
     pub fn this_crashes() {
         indy::pool::Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
 
@@ -92,7 +95,6 @@ mod test_sign_and_submit_request {
 
         indy::pool::Pool::close(pool_handle).unwrap();
 
-        assert!(false, "response {:?}", response);
 
         /*
          * The format of SignAndSubmitRequestAsync response is like this.
@@ -151,7 +153,6 @@ mod test_sign_and_submit_request {
 
         indy::pool::Pool::close(pool_handle).unwrap();
 
-        assert!(false, "response {:?}", stuff);
     }
 
     #[test]
@@ -181,7 +182,6 @@ mod test_sign_and_submit_request {
 
         indy::pool::Pool::close(pool_handle).unwrap();
 
-        assert!(false, "response {:?}", response);
 
     }
 
@@ -210,5 +210,241 @@ mod test_sign_and_submit_request {
         indy::pool::Pool::close(pool_handle).unwrap();
 
     }
+
+}
+
+#[cfg(test)]
+mod test_submit_request {
+    use super::*;
+
+    #[test]
+    pub fn submit_request_success() {
+
+    }
+
+    #[test]
+    pub fn submit_request_async_success() {
+
+    }
+
+    #[test]
+    pub fn submit_request_timeout_success() {
+
+    }
+
+    #[test]
+    pub fn submit_request_timeout_times_out() {
+
+    }
+
+}
+
+#[cfg(test)]
+mod test_submit_action {
+    use super::*;
+
+    #[test]
+    pub fn submit_action_success() {
+
+    }
+
+    #[test]
+    pub fn submit_action_async_success() {
+
+    }
+
+    #[test]
+    pub fn submit_action_timeout_success() {
+
+    }
+
+    #[test]
+    pub fn submit_action_timeout_times_out() {
+
+    }
+}
+
+#[cfg!(test)]
+mod test_sign_request {
+    use super::*;
+
+    #[test]
+    pub fn sign_request_success() {
+
+    }
+
+    #[test]
+    pub fn sign_request_async_success() {
+
+    }
+
+    #[test]
+    pub fn sign_request_timeout_success() {
+
+    }
+
+    #[test]
+    pub fn sign_request_timeout_times_out() {
+
+    }
+}
+
+#[cfg(test)]
+mod test_multi_sign_request {
+    use super::*;
+
+    #[test]
+    pub fn multi_sign_request_success() {
+
+    }
+
+    #[test]
+    pub fn multi_sign_request_async_success() {
+
+    }
+
+    #[test]
+    pub fn multi_sign_request_timeout_success() {
+
+    }
+
+    #[test]
+    pub fn multi_sign_request_timeout_times_out() {
+
+    }
+}
+
+#[cfg(test)]
+mod test_build_get_ddo_request {
+
+}
+
+#[cfg(test)]
+mod test_build_nym_request {
+
+}
+
+#[cfg(test)]
+mod test_build_get_nym_request {
+
+}
+
+#[cfg(test)]
+mod test_build_get_txn_request {
+
+}
+
+#[cfg(test)]
+mod test_build_attrib_request {
+
+}
+
+#[cfg(test)]
+mod test_build_get_attrib_request {
+
+}
+
+#[cfg(test)]
+mod test_build_schema_request {
+
+}
+
+#[cfg(test)]
+mod test_build_get_schema_request {
+
+}
+
+#[cfg(test)]
+mod test_build_cred_def_request {
+
+}
+
+#[cfg(test)]
+mod test_parse_get_schema_response {
+
+}
+
+#[cfg(test)]
+mod test_build_get_cred_def_request {
+
+}
+
+#[cfg(test)]
+mod test_parse_get_schema_response {
+
+}
+
+#[cfg(test)]
+mod test_parse_get_cred_def_response {
+
+}
+
+#[cfg(test)]
+mod test_build_node_request {
+
+}
+
+#[cfg(test)]
+mod test_build_get_validator_info_request {
+
+}
+
+#[cfg(test)]
+mod test_build_pool_config_request {
+
+}
+
+#[cfg(test)]
+mod test_build_pool_restart_request {
+
+}
+
+#[cfg(test)]
+mod test_build_pool_upgrade_request {
+
+}
+
+#[cfg(test)]
+mod test_build_revoc_reg_def_request {
+
+}
+
+#[cfg(test)]
+mod test_build_get_revoc_reg_def_request {
+
+}
+
+#[cfg(test)]
+mod test_parse_get_revoc_reg_def_response {
+
+}
+
+#[cfg(test)]
+mod test_build_revoc_reg_entry_request {
+
+}
+
+#[cfg(test)]
+mod test_build_get_revoc_reg_request {
+
+}
+
+#[cfg(test)]
+mod test_parse_get_revoc_reg_response {
+
+}
+
+#[cfg(test)]
+mod test_build_get_revoc_reg_delta_request {
+
+}
+
+#[cfg(test)]
+mod test_parse_get_revoc_reg_delta_response {
+
+}
+
+#[cfg(test)]
+mod test_register_transaction_parser_for_sp {
 
 }
