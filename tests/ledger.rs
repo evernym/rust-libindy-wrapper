@@ -511,22 +511,117 @@ mod test_sign_request {
 
     #[test]
     pub fn sign_request_success() {
+        Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
 
+        let wallet = Wallet::new();
+        let setup = Setup::new(&wallet, SetupConfig {
+            connect_to_pool: false,
+            num_trustees: 0,
+            num_nodes: 4,
+            num_users: 0,
+        });
+
+        let pool_handle = Pool::open_ledger(&setup.pool_name, None).unwrap();
+
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+        let validator_request = Ledger::build_get_validator_info_request(&did).unwrap();
+        let signed_request_result = Ledger::sign_request(wallet.handle, &did, &validator_request);
+
+        Pool::close(pool_handle).unwrap();
+
+        match signed_request_result {
+            Ok(_) => {},
+            Err(ec) => {
+                assert!(false, "sign_request returned error {:?}", ec);
+            }
+        }
     }
 
     #[test]
     pub fn sign_request_async_success() {
+        Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
 
+        let wallet = Wallet::new();
+        let setup = Setup::new(&wallet, SetupConfig {
+            connect_to_pool: false,
+            num_trustees: 0,
+            num_nodes: 4,
+            num_users: 0,
+        });
+
+        let pool_handle = Pool::open_ledger(&setup.pool_name, None).unwrap();
+
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+        let validator_request = Ledger::build_get_validator_info_request(&did).unwrap();
+
+        let (sender, receiver) = channel();
+        let cb = move |ec, stuff| {
+            sender.send((ec, stuff)).unwrap();
+        };
+        let signed_request_result = Ledger::sign_request_async(wallet.handle, &did, &validator_request, cb);
+
+        let (ec, _) = receiver.recv_timeout(Duration::from_secs(5)).unwrap();
+        Pool::close(pool_handle).unwrap();
+
+        assert_eq!(ec, ErrorCode::Success, "sign_request_async failed error_code {:?}", ec);
     }
 
     #[test]
     pub fn sign_request_timeout_success() {
+        Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
 
+        let wallet = Wallet::new();
+        let setup = Setup::new(&wallet, SetupConfig {
+            connect_to_pool: false,
+            num_trustees: 0,
+            num_nodes: 4,
+            num_users: 0,
+        });
+
+        let pool_handle = Pool::open_ledger(&setup.pool_name, None).unwrap();
+
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+        let validator_request = Ledger::build_get_validator_info_request(&did).unwrap();
+        let signed_request_result = Ledger::sign_request_timeout(wallet.handle, &did, &validator_request, VALID_TIMEOUT);
+
+        Pool::close(pool_handle).unwrap();
+
+        match signed_request_result {
+            Ok(_) => {},
+            Err(ec) => {
+                assert!(false, "sign_request_timeout returned error {:?}", ec);
+            }
+        }
     }
 
     #[test]
     pub fn sign_request_timeout_times_out() {
+        Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
 
+        let wallet = Wallet::new();
+        let setup = Setup::new(&wallet, SetupConfig {
+            connect_to_pool: false,
+            num_trustees: 0,
+            num_nodes: 4,
+            num_users: 0,
+        });
+
+        let pool_handle = Pool::open_ledger(&setup.pool_name, None).unwrap();
+
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+        let validator_request = Ledger::build_get_validator_info_request(&did).unwrap();
+        let signed_request_result = Ledger::sign_request_timeout(wallet.handle, &did, &validator_request, INVALID_TIMEOUT);
+
+        Pool::close(pool_handle).unwrap();
+
+        match signed_request_result {
+            Ok(_) => {
+                assert!(false, "sign_request_timeout DID NOT timeout as expected");
+            },
+            Err(ec) => {
+                assert_eq!(ec, ErrorCode::CommonIOError, "sign_request_timeout failed with {:?}", ec);
+            }
+        }
     }
 }
 
