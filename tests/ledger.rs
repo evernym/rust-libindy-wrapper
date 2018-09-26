@@ -748,31 +748,6 @@ mod test_multi_sign_request {
 }
 
 #[cfg(test)]
-mod test_build_get_ddo_request {
-    use super::*;
-
-    #[test]
-    pub fn build_get_ddo_request_success() {
-        assert!(false);
-    }
-
-    #[test]
-    pub fn build_get_ddo_request_async_success() {
-        assert!(false);
-    }
-
-    #[test]
-    pub fn build_get_ddo_request_timeout_success() {
-        assert!(false);
-    }
-
-    #[test]
-    pub fn build_get_ddo_request_timeout_times_out() {
-        assert!(false);
-    }
-}
-
-#[cfg(test)]
 mod test_build_nym_request {
     use super::*;
 
@@ -1000,18 +975,178 @@ mod test_build_get_nym_request {
 }
 
 #[cfg(test)]
-mod test_build_get_txn_request {
-
-}
-
-#[cfg(test)]
 mod test_build_attrib_request {
+    use super::*;
 
+    #[test]
+    pub fn build_attrib_request_success() {
+
+        let submitter_wallet = Wallet::new();
+        let wallet = Wallet::new();
+        let (submitter_did, _) = Did::new(submitter_wallet.handle, "{}").unwrap();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+        match Ledger::build_attrib_request(&submitter_did, &did, None, Some("{}"), None) {
+            Ok(_) => {},
+            Err(ec) => {
+                assert!(false, "build_attrib_request failed with error {:?}", ec);
+            }
+        }
+    }
+
+    #[test]
+    pub fn build_attrib_request_async_success() {
+        let submitter_wallet = Wallet::new();
+        let wallet = Wallet::new();
+        let (submitter_did, _) = Did::new(submitter_wallet.handle, "{}").unwrap();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+
+        let (sender, receiver) = channel();
+        let cb = move |ec, stuff| {
+            sender.send((ec, stuff)).unwrap();
+        };
+
+        let request_error_code =  Ledger::build_attrib_request_async(&submitter_did, &did, None, Some("{}"), None, cb);
+
+        assert_eq!(request_error_code, ErrorCode::Success, "build_attrib_request_async returned {:?}", request_error_code);
+
+        let (ec, _) = receiver.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_eq!(ec, ErrorCode::Success, "build_attrib_request_async returned error_code {:?}", ec);
+
+    }
+
+    #[test]
+    pub fn build_attrib_request_timeout_success() {
+
+        let submitter_wallet = Wallet::new();
+        let wallet = Wallet::new();
+        let (submitter_did, _) = Did::new(submitter_wallet.handle, "{}").unwrap();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+        match Ledger::build_attrib_request_timeout(&submitter_did, &did, None, Some("{}"), None, VALID_TIMEOUT) {
+            Ok(_) => {},
+            Err(ec) => {
+                assert!(false, "build_attrib_request_timeout failed with error {:?}", ec);
+            }
+        }
+    }
+
+    #[test]
+    pub fn build_attrib_request_timeout_times_out() {
+        let submitter_wallet = Wallet::new();
+        let wallet = Wallet::new();
+        let (submitter_did, _) = Did::new(submitter_wallet.handle, "{}").unwrap();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+        match Ledger::build_attrib_request_timeout(&submitter_did, &did, None, Some("{}"), None, INVALID_TIMEOUT) {
+            Ok(_) => {
+                assert!(false, "build_attrib_request_timeout did not time out");
+            },
+            Err(ec) => {
+                assert_eq!(ec, ErrorCode::CommonIOError, "build_attrib_request_timeout failed with error {:?}", ec);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 mod test_build_get_attrib_request {
 
+    use super::*;
+
+    #[test]
+    pub fn build_get_attrib_request_success() {
+
+        let submitter_wallet = Wallet::new();
+        let wallet = Wallet::new();
+        let (submitter_did, _) = Did::new(submitter_wallet.handle, "{}").unwrap();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+        match Ledger::build_get_attrib_request(Some(&submitter_did), &did, Some("{}"), None, None) {
+            Ok(_) => {},
+            Err(ec) => {
+                assert!(false, "build_attrib_request failed with error {:?}", ec);
+            }
+        }
+    }
+
+    #[test]
+    pub fn build_get_attrib_request_async_success() {
+        let submitter_wallet = Wallet::new();
+        let wallet = Wallet::new();
+        let (submitter_did, _) = Did::new(submitter_wallet.handle, "{}").unwrap();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+
+        let (sender, receiver) = channel();
+        let cb = move |ec, stuff| {
+            sender.send((ec, stuff)).unwrap();
+        };
+
+        let request_error_code =  Ledger::build_get_attrib_request_async(Some(&submitter_did), &did, Some("{}"), None, None, cb);
+
+        assert_eq!(request_error_code, ErrorCode::Success, "build_get_attrib_request_async returned {:?}", request_error_code);
+
+        let (ec, _) = receiver.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_eq!(ec, ErrorCode::Success, "build_get_attrib_request_async returned error_code {:?}", ec);
+
+    }
+
+    #[test]
+    pub fn build_get_attrib_request_timeout_success() {
+
+        let submitter_wallet = Wallet::new();
+        let wallet = Wallet::new();
+        let (submitter_did, _) = Did::new(submitter_wallet.handle, "{}").unwrap();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+        match Ledger::build_get_attrib_request_timeout(Some(&submitter_did), &did, Some("{}"), None, None, VALID_TIMEOUT) {
+            Ok(_) => {},
+            Err(ec) => {
+                assert!(false, "build_get_attrib_request_timeout failed with error {:?}", ec);
+            }
+        }
+    }
+
+    #[test]
+    pub fn build_get_attrib_request_timeout_times_out() {
+        let submitter_wallet = Wallet::new();
+        let wallet = Wallet::new();
+        let (submitter_did, _) = Did::new(submitter_wallet.handle, "{}").unwrap();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+        match Ledger::build_get_attrib_request_timeout(Some(&submitter_did), &did, Some("{}"), None, None, INVALID_TIMEOUT) {
+            Ok(_) => {
+                assert!(false, "build_attrib_request_timeout did not time out");
+            },
+            Err(ec) => {
+                assert_eq!(ec, ErrorCode::CommonIOError, "build_get_attrib_request_timeout failed with error {:?}", ec);
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_build_get_txn_request {
+
+}
+
+#[cfg(test)]
+mod test_build_get_ddo_request {
+    use super::*;
+
+    #[test]
+    pub fn build_get_ddo_request_success() {
+        assert!(false);
+    }
+
+    #[test]
+    pub fn build_get_ddo_request_async_success() {
+        assert!(false);
+    }
+
+    #[test]
+    pub fn build_get_ddo_request_timeout_success() {
+        assert!(false);
+    }
+
+    #[test]
+    pub fn build_get_ddo_request_timeout_times_out() {
+        assert!(false);
+    }
 }
 
 #[cfg(test)]
