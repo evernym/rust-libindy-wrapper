@@ -35,11 +35,11 @@ mod test_sign_and_submit_request {
     use super::*;
 
 
-    // the purpose of this test is to show a crash, it should not be part of the regular
-    // tests
+    // the purpose of this test is to show a crash.  This bug needs to be researched as a possible bug
+    // in libindy
     #[test]
     #[ignore]
-    pub fn this_crashes() {
+    pub fn sign_and_submit_request_crashes() {
         Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
 
         let wallet = utils::wallet::Wallet::new();
@@ -347,6 +347,41 @@ mod test_submit_request {
 mod test_submit_action {
     use super::*;
 
+    const NODES : &str = "[\"Node1\", \"Node2\"]";
+
+    // This test needs to be researched as a possible bug in libindy.  No errors are returned, it hangs forever,
+    // ignoring the timeout
+    #[test]
+    pub fn submit_action_this_hangs_indefinitely() {
+
+        Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
+
+        let wallet = Wallet::new();
+        let setup = Setup::new(&wallet, SetupConfig {
+            connect_to_pool: false,
+            num_trustees: 0,
+            num_nodes: 4,
+            num_users: 0,
+        });
+
+        let pool_handle = Pool::open_ledger(&setup.pool_name, None).unwrap();
+
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+        let validator_request = Ledger::build_get_validator_info_request(&did).unwrap();
+        let signed_request = Ledger::sign_request(wallet.handle, &did, &validator_request).unwrap();
+
+        let result = Ledger::submit_action(pool_handle, &signed_request, "[]", 5);
+
+        Pool::close(pool_handle).unwrap();
+
+        match result {
+            Ok(_) => {},
+            Err(ec) => {
+                assert!(false, "submit_action_success failed with {:?} extra {:?}", ec, signed_request);
+            }
+        }
+    }
+
     #[test]
     pub fn submit_action_success() {
 
@@ -366,7 +401,7 @@ mod test_submit_action {
         let validator_request = Ledger::build_get_validator_info_request(&did).unwrap();
         let signed_request = Ledger::sign_request(wallet.handle, &did, &validator_request).unwrap();
 
-        let result = Ledger::submit_action(pool_handle, &signed_request, "[\"Node1\", \"Node2\"]", 5);
+        let result = Ledger::submit_action(pool_handle, &signed_request, NODES, 5);
 
         Pool::close(pool_handle).unwrap();
 
@@ -400,7 +435,7 @@ mod test_submit_action {
             sender.send((ec, stuff)).unwrap();
         };
 
-        Ledger::submit_action_async(pool_handle, &validator_request, "[\"Node1\", \"Node2\"]", 5, cb);
+        Ledger::submit_action_async(pool_handle, &validator_request, NODES, 5, cb);
 
         let (ec, _) = receiver.recv_timeout(Duration::from_secs(5)).unwrap();
 
@@ -426,7 +461,7 @@ mod test_submit_action {
         let (did, _) = Did::new(wallet.handle, "{}").unwrap();
         let validator_request = Ledger::build_get_validator_info_request(&did).unwrap();
 
-        let result = Ledger::submit_action_timeout(pool_handle, &validator_request, "[\"Node1\", \"Node2\"]", 5, VALID_TIMEOUT);
+        let result = Ledger::submit_action_timeout(pool_handle, &validator_request, NODES, 5, VALID_TIMEOUT);
 
         Pool::close(pool_handle).unwrap();
 
@@ -455,7 +490,7 @@ mod test_submit_action {
         let (did, _) = Did::new(wallet.handle, "{}").unwrap();
         let validator_request = Ledger::build_get_validator_info_request(&did).unwrap();
 
-        let result = Ledger::submit_action_timeout(pool_handle, &validator_request, "[\"Node1\", \"Node2\"]", 5, INVALID_TIMEOUT);
+        let result = Ledger::submit_action_timeout(pool_handle, &validator_request, NODES, 5, INVALID_TIMEOUT);
 
         Pool::close(pool_handle).unwrap();
 
