@@ -12,10 +12,10 @@ mod utils;
 use indy::did::Did;
 use indy::ErrorCode;
 use indy::ledger::Ledger;
+use indy::pool::Pool;
 use std::sync::mpsc::channel;
 use std::time::Duration;
-use utils::b58::{FromBase58, IntoBase58};
-use utils::constants::{DID_1, INVALID_TIMEOUT, METADATA, PROTOCOL_VERSION, SEED_1, VALID_TIMEOUT, VERKEY_1, VERKEY_ABV_1};
+use utils::constants::{INVALID_TIMEOUT, PROTOCOL_VERSION, VALID_TIMEOUT};
 use utils::setup::{Setup, SetupConfig};
 use utils::wallet::Wallet;
 
@@ -40,7 +40,7 @@ mod test_sign_and_submit_request {
     #[test]
     #[ignore]
     pub fn this_crashes() {
-        indy::pool::Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
+        Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
 
         let wallet = utils::wallet::Wallet::new();
         let setup = Setup::new(&wallet, SetupConfig {
@@ -50,8 +50,8 @@ mod test_sign_and_submit_request {
             num_users: 0,
         });
 
-        let pool_handle = indy::pool::Pool::open_ledger(&setup.pool_name, None).unwrap();
-        let (did, verkey) = Did::new(wallet.handle, "{}").unwrap();
+        let pool_handle = Pool::open_ledger(&setup.pool_name, None).unwrap();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
 
         let result = indy::ledger::Ledger::sign_and_submit_request(pool_handle, wallet.handle, &did, "{}");
 
@@ -62,16 +62,16 @@ mod test_sign_and_submit_request {
             Err(ec) => { assert!(false, "sign_and_submit_request_success got error code {:?}", ec); },
         }
 
-        indy::pool::Pool::close(pool_handle).unwrap();
+        Pool::close(pool_handle).unwrap();
 
         assert!(false, "response {:?}", response);
     }
 
     #[test]
     pub fn sign_and_submit_request_success() {
-        indy::pool::Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
+        Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
 
-        let wallet = utils::wallet::Wallet::new();
+        let wallet = Wallet::new();
         let setup = Setup::new(&wallet, SetupConfig {
             connect_to_pool: false,
             num_trustees: 0,
@@ -79,19 +79,17 @@ mod test_sign_and_submit_request {
             num_users: 0,
         });
 
-        let pool_handle = indy::pool::Pool::open_ledger(&setup.pool_name, None).unwrap();
+        let pool_handle = Pool::open_ledger(&setup.pool_name, None).unwrap();
         let (did, _) = Did::new(wallet.handle, "{}").unwrap();
 
-        let result = indy::ledger::Ledger::sign_and_submit_request(pool_handle, wallet.handle, &did, REQUEST_JSON);
+        let result = Ledger::sign_and_submit_request(pool_handle, wallet.handle, &did, REQUEST_JSON);
 
-        let mut response : String = "".to_string();
+        Pool::close(pool_handle).unwrap();
 
         match result {
-            Ok(return_response) => { response = return_response; },
+            Ok(_) => { },
             Err(ec) => { assert!(false, "sign_and_submit_request_success got error code {:?}", ec); },
         }
-
-        indy::pool::Pool::close(pool_handle).unwrap();
 
 
         /*
@@ -127,9 +125,9 @@ mod test_sign_and_submit_request {
 
     #[test]
     pub fn sign_and_submit_request_async_success() {
-        indy::pool::Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
+        Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
 
-        let wallet = utils::wallet::Wallet::new();
+        let wallet = Wallet::new();
         let setup = Setup::new(&wallet, SetupConfig {
             connect_to_pool: false,
             num_trustees: 0,
@@ -137,7 +135,7 @@ mod test_sign_and_submit_request {
             num_users: 0,
         });
 
-        let pool_handle = indy::pool::Pool::open_ledger(&setup.pool_name, None).unwrap();
+        let pool_handle = Pool::open_ledger(&setup.pool_name, None).unwrap();
         let (did, _) = Did::new(wallet.handle, "{}").unwrap();
 
         let (sender, receiver) = channel();
@@ -145,20 +143,21 @@ mod test_sign_and_submit_request {
             sender.send((ec, stuff)).unwrap();
         };
 
-        indy::ledger::Ledger::sign_and_submit_request_async(pool_handle, wallet.handle, &did, REQUEST_JSON, cb);
+        Ledger::sign_and_submit_request_async(pool_handle, wallet.handle, &did, REQUEST_JSON, cb);
 
-        let (ec, stuff) = receiver.recv_timeout(Duration::from_secs(5)).unwrap();
+        let (ec, _) = receiver.recv_timeout(Duration::from_secs(5)).unwrap();
 
-        indy::pool::Pool::close(pool_handle).unwrap();
+        Pool::close(pool_handle).unwrap();
 
+        assert_eq!(ec, ErrorCode::Success);
     }
 
     #[test]
     pub fn sign_and_submit_request_timeout_success() {
 
-        indy::pool::Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
+        Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
 
-        let wallet = utils::wallet::Wallet::new();
+        let wallet = Wallet::new();
         let setup = Setup::new(&wallet, SetupConfig {
             connect_to_pool: false,
             num_trustees: 0,
@@ -166,12 +165,12 @@ mod test_sign_and_submit_request {
             num_users: 0,
         });
 
-        let pool_handle = indy::pool::Pool::open_ledger(&setup.pool_name, None).unwrap();
+        let pool_handle = Pool::open_ledger(&setup.pool_name, None).unwrap();
         let (did, _) = Did::new(wallet.handle, "{}").unwrap();
 
-        let result = indy::ledger::Ledger::sign_and_submit_request_timeout(pool_handle, wallet.handle, &did, REQUEST_JSON, VALID_TIMEOUT);
-        indy::pool::Pool::close(pool_handle).unwrap();
-        
+        let result = Ledger::sign_and_submit_request_timeout(pool_handle, wallet.handle, &did, REQUEST_JSON, VALID_TIMEOUT);
+        Pool::close(pool_handle).unwrap();
+
         match result {
             Ok(_) => {  },
             Err(ec) => { assert!(false, "sign_and_submit_request_timeout_success got error code {:?}", ec); },
@@ -182,9 +181,9 @@ mod test_sign_and_submit_request {
 
     #[test]
     pub fn sign_and_submit_request_timeout_times_out() {
-        indy::pool::Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
+        Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
 
-        let wallet = utils::wallet::Wallet::new();
+        let wallet = Wallet::new();
         let setup = Setup::new(&wallet, SetupConfig {
             connect_to_pool: false,
             num_trustees: 0,
@@ -192,18 +191,18 @@ mod test_sign_and_submit_request {
             num_users: 0,
         });
 
-        let pool_handle = indy::pool::Pool::open_ledger(&setup.pool_name, None).unwrap();;
+        let pool_handle = Pool::open_ledger(&setup.pool_name, None).unwrap();;
         let (did, _) = Did::new(wallet.handle, "{}").unwrap();
 
-        let result = indy::ledger::Ledger::sign_and_submit_request_timeout(pool_handle, wallet.handle, &did, REQUEST_JSON, INVALID_TIMEOUT);
-        indy::pool::Pool::close(pool_handle).unwrap();
+        let result = Ledger::sign_and_submit_request_timeout(pool_handle, wallet.handle, &did, REQUEST_JSON, INVALID_TIMEOUT);
+        Pool::close(pool_handle).unwrap();
 
         match result {
             Ok(_) => {
                 assert!(false, "sign_and_submit_request_timeout DID NOT time out");
             },
             Err(ec) => {
-                assert_eq!(ec, indy::ErrorCode::CommonIOError, "sign_and_submit_request_timeout error code didn't match expected => {:?}", ec);
+                assert_eq!(ec, ErrorCode::CommonIOError, "sign_and_submit_request_timeout error code didn't match expected => {:?}", ec);
             },
         }
     }
@@ -216,9 +215,9 @@ mod test_submit_request {
 
     #[test]
     pub fn submit_request_success() {
-        indy::pool::Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
+        Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
 
-        let wallet = utils::wallet::Wallet::new();
+        let wallet = Wallet::new();
         let setup = Setup::new(&wallet, SetupConfig {
             connect_to_pool: false,
             num_trustees: 0,
@@ -226,12 +225,12 @@ mod test_submit_request {
             num_users: 0,
         });
 
-        let pool_handle = indy::pool::Pool::open_ledger(&setup.pool_name, None).unwrap();
+        let pool_handle = Pool::open_ledger(&setup.pool_name, None).unwrap();
         let (_, _) = Did::new(wallet.handle, "{}").unwrap();
 
-        let submit_request_result = indy::ledger::Ledger::submit_request(pool_handle, REQUEST_JSON);
+        let submit_request_result = Ledger::submit_request(pool_handle, REQUEST_JSON);
 
-        indy::pool::Pool::close(pool_handle).unwrap();
+        Pool::close(pool_handle).unwrap();
 
         match submit_request_result {
             Ok(submit_request_response) => {
@@ -249,7 +248,7 @@ mod test_submit_request {
 
     #[test]
     pub fn submit_request_async_success() {
-        indy::pool::Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
+        Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
 
         let wallet = utils::wallet::Wallet::new();
         let setup = Setup::new(&wallet, SetupConfig {
@@ -259,7 +258,7 @@ mod test_submit_request {
             num_users: 0,
         });
 
-        let pool_handle = indy::pool::Pool::open_ledger(&setup.pool_name, None).unwrap();
+        let pool_handle = Pool::open_ledger(&setup.pool_name, None).unwrap();
         let (_, _) = Did::new(wallet.handle, "{}").unwrap();
 
         let (sender, receiver) = channel();
@@ -271,9 +270,9 @@ mod test_submit_request {
 
         let (ec, submit_request_response) = receiver.recv_timeout(Duration::from_secs(5)).unwrap();
 
-        indy::pool::Pool::close(pool_handle).unwrap();
+        Pool::close(pool_handle).unwrap();
 
-        assert_eq!(ec, indy::ErrorCode::Success, "submit_request did not return ErrorCode::Success => {:?}", ec);
+        assert_eq!(ec, ErrorCode::Success, "submit_request did not return ErrorCode::Success => {:?}", ec);
 
         // return is REQNACK client request invalid: MissingSignature()....this is ok.  we wanted to make sure the function works
         // and getting that response back indicates success
@@ -283,7 +282,7 @@ mod test_submit_request {
 
     #[test]
     pub fn submit_request_timeout_success() {
-        indy::pool::Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
+        Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
 
         let wallet = utils::wallet::Wallet::new();
         let setup = Setup::new(&wallet, SetupConfig {
@@ -293,12 +292,12 @@ mod test_submit_request {
             num_users: 0,
         });
 
-        let pool_handle = indy::pool::Pool::open_ledger(&setup.pool_name, None).unwrap();
+        let pool_handle = Pool::open_ledger(&setup.pool_name, None).unwrap();
         let (_, _) = Did::new(wallet.handle, "{}").unwrap();
 
         let submit_request_result = indy::ledger::Ledger::submit_request_timeout(pool_handle, REQUEST_JSON, VALID_TIMEOUT);
 
-        indy::pool::Pool::close(pool_handle).unwrap();
+        Pool::close(pool_handle).unwrap();
 
         match submit_request_result {
             Ok(submit_request_response) => {
@@ -315,7 +314,7 @@ mod test_submit_request {
 
     #[test]
     pub fn submit_request_timeout_times_out() {
-        indy::pool::Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
+        Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
 
         let wallet = utils::wallet::Wallet::new();
         let setup = Setup::new(&wallet, SetupConfig {
@@ -325,19 +324,19 @@ mod test_submit_request {
             num_users: 0,
         });
 
-        let pool_handle = indy::pool::Pool::open_ledger(&setup.pool_name, None).unwrap();
+        let pool_handle = Pool::open_ledger(&setup.pool_name, None).unwrap();
         let (_, _) = Did::new(wallet.handle, "{}").unwrap();
 
         let submit_request_result = indy::ledger::Ledger::submit_request_timeout(pool_handle, REQUEST_JSON, INVALID_TIMEOUT);
 
-        indy::pool::Pool::close(pool_handle).unwrap();
+        Pool::close(pool_handle).unwrap();
 
         match submit_request_result {
             Ok(_) => {
                 assert!(false, "submit_request_timeout DID NOT time out");
             },
             Err(ec) => {
-                assert_eq!(ec, indy::ErrorCode::CommonIOError, "submit_request_timeout error code didn't match expected => {:?}", ec);
+                assert_eq!(ec, ErrorCode::CommonIOError, "submit_request_timeout error code didn't match expected => {:?}", ec);
             },
         }
     }
