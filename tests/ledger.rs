@@ -350,21 +350,123 @@ mod test_submit_action {
     #[test]
     pub fn submit_action_success() {
 
+        Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
+
+        let wallet = Wallet::new();
+        let setup = Setup::new(&wallet, SetupConfig {
+            connect_to_pool: false,
+            num_trustees: 0,
+            num_nodes: 4,
+            num_users: 0,
+        });
+
+        let pool_handle = Pool::open_ledger(&setup.pool_name, None).unwrap();
+
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+        let validator_request = Ledger::build_get_validator_info_request(&did).unwrap();
+        let signed_request = Ledger::sign_request(wallet.handle, &did, &validator_request).unwrap();
+
+        let result = Ledger::submit_action(pool_handle, &signed_request, "[\"Node1\", \"Node2\"]", 5);
+
+        Pool::close(pool_handle).unwrap();
+
+        match result {
+            Ok(_) => {},
+            Err(ec) => {
+                assert!(false, "submit_action_success failed with {:?} extra {:?}", ec, signed_request);
+            }
+        }
     }
 
     #[test]
     pub fn submit_action_async_success() {
+        Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
 
+        let wallet = Wallet::new();
+        let setup = Setup::new(&wallet, SetupConfig {
+            connect_to_pool: false,
+            num_trustees: 0,
+            num_nodes: 4,
+            num_users: 0,
+        });
+
+        let pool_handle = Pool::open_ledger(&setup.pool_name, None).unwrap();
+
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+        let validator_request = Ledger::build_get_validator_info_request(&did).unwrap();
+
+        let (sender, receiver) = channel();
+        let cb = move |ec, stuff| {
+            sender.send((ec, stuff)).unwrap();
+        };
+
+        Ledger::submit_action_async(pool_handle, &validator_request, "[\"Node1\", \"Node2\"]", 5, cb);
+
+        let (ec, _) = receiver.recv_timeout(Duration::from_secs(5)).unwrap();
+
+        Pool::close(pool_handle).unwrap();
+
+        assert_eq!(ec, ErrorCode::Success, "submit_action_async failed error_code {:?}", ec);
     }
 
     #[test]
     pub fn submit_action_timeout_success() {
+        Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
 
+        let wallet = Wallet::new();
+        let setup = Setup::new(&wallet, SetupConfig {
+            connect_to_pool: false,
+            num_trustees: 0,
+            num_nodes: 4,
+            num_users: 0,
+        });
+
+        let pool_handle = Pool::open_ledger(&setup.pool_name, None).unwrap();
+
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+        let validator_request = Ledger::build_get_validator_info_request(&did).unwrap();
+
+        let result = Ledger::submit_action_timeout(pool_handle, &validator_request, "[\"Node1\", \"Node2\"]", 5, VALID_TIMEOUT);
+
+        Pool::close(pool_handle).unwrap();
+
+        match result {
+            Ok(_) => {},
+            Err(ec) => {
+                assert!(false, "submit_action_timeout failed with {:?} extra {:?}", ec, validator_request);
+            }
+        }
     }
 
     #[test]
     pub fn submit_action_timeout_times_out() {
+        Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
 
+        let wallet = Wallet::new();
+        let setup = Setup::new(&wallet, SetupConfig {
+            connect_to_pool: false,
+            num_trustees: 0,
+            num_nodes: 4,
+            num_users: 0,
+        });
+
+        let pool_handle = Pool::open_ledger(&setup.pool_name, None).unwrap();
+
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+        let validator_request = Ledger::build_get_validator_info_request(&did).unwrap();
+
+        let result = Ledger::submit_action_timeout(pool_handle, &validator_request, "[\"Node1\", \"Node2\"]", 5, INVALID_TIMEOUT);
+
+        Pool::close(pool_handle).unwrap();
+
+        match result {
+            Ok(_) => {
+                assert!(false, "submit_action_timeout DID NOT timeout as expected");
+            },
+            Err(ec) => {
+                assert_eq!(ec, ErrorCode::CommonIOError, "submit_action_timeout failed with {:?}", ec);
+            }
+        }
     }
 }
 
