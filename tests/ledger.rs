@@ -7,7 +7,7 @@ extern crate rust_libindy_wrapper as indy;
 #[allow(unused_macros)]
 #[allow(dead_code)]
 #[macro_use]
-mod utils;
+pub mod utils;
 
 use indy::did::Did;
 use indy::ErrorCode;
@@ -560,10 +560,12 @@ mod test_sign_request {
         };
         let signed_request_result = Ledger::sign_request_async(wallet.handle, &did, &validator_request, cb);
 
+        assert_eq!(signed_request_result, ErrorCode::Success, "sign_request_async failed error_code {:?}", signed_request_result);
+
         let (ec, _) = receiver.recv_timeout(Duration::from_secs(5)).unwrap();
         Pool::close(pool_handle).unwrap();
 
-        assert_eq!(ec, ErrorCode::Success, "sign_request_async failed error_code {:?}", ec);
+        assert_eq!(ec, ErrorCode::Success, "sign_request_async returned error_code {:?}", ec);
     }
 
     #[test]
@@ -896,7 +898,105 @@ mod test_build_nym_request {
 
 #[cfg(test)]
 mod test_build_get_nym_request {
+    use super::*;
 
+    #[test]
+    pub fn build_get_nym_request_success() {
+        Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
+
+        let submitter_wallet = Wallet::new();
+        let wallet = Wallet::new();
+        let (submitter_did, _) = Did::new(submitter_wallet.handle, "{}").unwrap();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+
+        let get_result = Ledger::build_get_nym_request(Some(&submitter_did), &did);
+
+        match get_result {
+            Ok(_) => {},
+            Err(ec) => {
+                assert!(false, "build_get_nym_request returned error_code {:?}", ec);
+            }
+        }
+    }
+
+    #[test]
+    pub fn build_get_nym_request_no_submitter_did_success() {
+        Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
+
+        let wallet = Wallet::new();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+
+        let get_result = Ledger::build_get_nym_request(None, &did);
+
+        match get_result {
+            Ok(_) => {},
+            Err(ec) => {
+                assert!(false, "build_get_nym_request returned error_code {:?}", ec);
+            }
+        }
+    }
+
+    #[test]
+    pub fn build_get_nym_request_async_success() {
+        Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
+
+        let submitter_wallet = Wallet::new();
+        let wallet = Wallet::new();
+        let (submitter_did, _) = Did::new(submitter_wallet.handle, "{}").unwrap();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+
+        let (sender, receiver) = channel();
+        let cb = move |ec, stuff| {
+            sender.send((ec, stuff)).unwrap();
+        };
+
+        let get_async_result = Ledger::build_get_nym_request_async(Some(&submitter_did), &did, cb);
+
+        assert_eq!(get_async_result, ErrorCode::Success, "build_get_nym_request_async failed {:?}", get_async_result);
+
+        let (ec, _) = receiver.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_eq!(ec, ErrorCode::Success, "build_get_nym_request_async returned error_code {:?}", ec);
+    }
+
+    #[test]
+    pub fn build_get_nym_request_timeout_success() {
+        Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
+
+        let submitter_wallet = Wallet::new();
+        let wallet = Wallet::new();
+        let (submitter_did, _) = Did::new(submitter_wallet.handle, "{}").unwrap();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+
+        let get_result = Ledger::build_get_nym_request_timeout(Some(&submitter_did), &did, VALID_TIMEOUT);
+
+        match get_result {
+            Ok(_) => {},
+            Err(ec) => {
+                assert!(false, "build_get_nym_request_timeout returned error_code {:?}", ec);
+            }
+        }
+    }
+
+    #[test]
+    pub fn build_get_nym_request_timeout_times_out() {
+        Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
+
+        let submitter_wallet = Wallet::new();
+        let wallet = Wallet::new();
+        let (submitter_did, _) = Did::new(submitter_wallet.handle, "{}").unwrap();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+
+        let get_result = Ledger::build_get_nym_request_timeout(Some(&submitter_did), &did, INVALID_TIMEOUT);
+
+        match get_result {
+            Ok(_) => {
+                assert!(false, "build_get_nym_request_timeout DID NOT time out as expected");
+            },
+            Err(ec) => {
+                assert_eq!(ec, ErrorCode::CommonIOError, "build_get_nym_request_timeout returned error_code {:?}", ec);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
