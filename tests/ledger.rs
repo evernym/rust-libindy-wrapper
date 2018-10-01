@@ -34,39 +34,6 @@ mod test_sign_and_submit_request {
 
     use super::*;
 
-
-    // the purpose of this test is to show a crash.  This bug needs to be researched as a possible bug
-    // in libindy
-    #[test]
-    #[ignore]
-    pub fn sign_and_submit_request_crashes() {
-        Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
-
-        let wallet = utils::wallet::Wallet::new();
-        let setup = Setup::new(&wallet, SetupConfig {
-            connect_to_pool: false,
-            num_trustees: 0,
-            num_nodes: 4,
-            num_users: 0,
-        });
-
-        let pool_handle = Pool::open_ledger(&setup.pool_name, None).unwrap();
-        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
-
-        let result = indy::ledger::Ledger::sign_and_submit_request(pool_handle, wallet.handle, &did, "{}");
-
-        let mut response : String = "".to_string();
-
-        match result {
-            Ok(return_response) => { response = return_response; },
-            Err(ec) => { assert!(false, "sign_and_submit_request_success got error code {:?}", ec); },
-        }
-
-        Pool::close(pool_handle).unwrap();
-
-        assert!(false, "response {:?}", response);
-    }
-
     #[test]
     pub fn sign_and_submit_request_success() {
         Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
