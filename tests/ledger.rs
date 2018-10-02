@@ -1087,6 +1087,235 @@ mod test_build_get_attrib_request {
 }
 
 #[cfg(test)]
+mod test_build_schema_request {
+    use super::*;
+
+    const SCHEMA_DATA : &str = r#"{"id":"id","attrNames": ["name", "male"],"name":"gvt2","version":"3.1","ver":"1.0"}"#;
+
+    #[test]
+    pub fn build_schema_request_success() {
+        let wallet = Wallet::new();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+
+        match Ledger::build_schema_request(&did, SCHEMA_DATA) {
+            Ok(_) => {},
+            Err(ec) => {
+                assert!(false, "build_schema_request failed with error {:?}", ec);
+            }
+        }
+    }
+
+    #[test]
+    pub fn build_schema_request_async_success() {
+        let wallet = Wallet::new();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+
+        let (sender, receiver) = channel();
+        let cb = move |ec, stuff| {
+            sender.send((ec, stuff)).unwrap();
+        };
+
+        let async_ec = Ledger::build_schema_request_async(&did, SCHEMA_DATA, cb);
+        assert_eq!(async_ec, ErrorCode::Success, "build_schema_request_async returned {:?}", async_ec);
+
+        let (ec, _) = receiver.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_eq!(ec, ErrorCode::Success, "build_schema_request_async returned error_code {:?}", ec);
+    }
+
+    #[test]
+    pub fn build_schema_request_timeout_success() {
+        let wallet = Wallet::new();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+
+        match Ledger::build_schema_request_timeout(&did, SCHEMA_DATA, VALID_TIMEOUT) {
+            Ok(_) => {},
+            Err(ec) => {
+                assert!(false, "build_schema_request_timeout failed with error {:?}", ec);
+            }
+        }
+    }
+
+    #[test]
+    pub fn build_schema_request_timeout_times_out() {
+        let wallet = Wallet::new();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+
+        match Ledger::build_schema_request_timeout(&did, SCHEMA_DATA, INVALID_TIMEOUT) {
+            Ok(_) => {
+                assert!(false, "build_schema_request_timeout failed to TIME OUT");
+            },
+            Err(ec) => {
+                assert_eq!(ec, ErrorCode::CommonIOError, "build_schema_request_timeout failed with error {:?}", ec);
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_build_get_schema_request {
+use super::*;
+
+    const SCHEMA_REQUEST : &str = "5LEV4bTAXntXqmtLFm7yCS:2:bob:1.0";
+
+    #[test]
+    pub fn build_get_schema_request_success() {
+        let wallet = Wallet::new();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+
+
+        match Ledger::build_get_schema_request(Some(&did), SCHEMA_REQUEST) {
+            Ok(_) => {},
+            Err(ec) => {
+                assert!(false, "build_get_schema_request failed with error {:?}", ec);
+            }
+        }
+    }
+
+    #[test]
+    pub fn build_get_schema_request_async_success() {
+        let wallet = Wallet::new();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+
+        let (sender, receiver) = channel();
+        let cb = move |ec, stuff| {
+            sender.send((ec, stuff)).unwrap();
+        };
+
+        let async_ec = Ledger::build_get_schema_request_async(Some(&did), SCHEMA_REQUEST, cb);
+        assert_eq!(async_ec, ErrorCode::Success, "build_get_schema_request_async returned {:?}", async_ec);
+
+        let (ec, _) = receiver.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_eq!(ec, ErrorCode::Success, "build_get_schema_request_async returned error_code {:?}", ec);
+    }
+
+    #[test]
+    pub fn build_get_schema_request_timeout_success() {
+        let wallet = Wallet::new();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+
+        match Ledger::build_get_schema_request_timeout(Some(&did), SCHEMA_REQUEST, VALID_TIMEOUT) {
+            Ok(_) => {},
+            Err(ec) => {
+                assert!(false, "build_get_schema_request_timeout failed with error {:?}", ec);
+            }
+        }
+    }
+
+    #[test]
+    pub fn build_get_schema_request_timeout_times_out() {
+        let wallet = Wallet::new();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+
+        match Ledger::build_get_schema_request_timeout(Some(&did), SCHEMA_REQUEST, INVALID_TIMEOUT) {
+            Ok(_) => {
+                assert!(false, "build_get_schema_request_timeout failed to TIME OUT");
+            },
+            Err(ec) => {
+                assert_eq!(ec, ErrorCode::CommonIOError, "build_get_schema_request_timeout failed with error {:?}", ec);
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_parse_get_schema_response {
+
+    use super::*;
+
+    const SCHEMA_DATA : &str = r#"{"id":"id","attrNames": ["name", "male"],"name":"gvt2","version":"3.1","ver":"1.0"}"#;
+
+
+    fn create_build_schema_request(did : &String, key : &String) -> String {
+        format!("{}:2:{}:1.0", did, key)
+    }
+
+    #[test]
+    pub fn parse_get_schema_response_success() {
+        Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
+
+        let wallet = Wallet::new();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+        let setup = Setup::new(&wallet, SetupConfig {
+            connect_to_pool: false,
+            num_trustees: 0,
+            num_nodes: 4,
+            num_users: 0,
+        });
+
+        let schema_request = create_build_schema_request(&did, &"bob".to_string());
+
+        let pool_handle = Pool::open_ledger(&setup.pool_name, None).unwrap();
+
+        let schema_response = Ledger::build_get_schema_request(Some(&did), &schema_request).unwrap();
+
+        let signed_response = Ledger::sign_request(wallet.handle, &did,&schema_response).unwrap();
+        let submit_response = Ledger::submit_request(pool_handle, &signed_response).unwrap();
+
+        let parse_response = Ledger::parse_get_schema_response(&submit_response);
+
+        Pool::close(pool_handle).unwrap();
+
+        match parse_response {
+            Ok(_) => {},
+            Err(ec) => {
+                assert!(false, "parse_get_schema_response failed error_code {:?} \n\n using submit_response {:?} \n\n with signed_response {:?} \n\n from schema_response {:?} \n\n schema {:?}", ec, submit_response, signed_response, schema_response, schema_request);
+            }
+        }
+    }
+
+    #[test]
+    pub fn parse_get_schema_response_async_success() {
+        let wallet = Wallet::new();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+
+        let (sender, receiver) = channel();
+        let cb = move |ec, s1, s2| {
+            sender.send((ec, s1, s2)).unwrap();
+        };
+
+        let response = Ledger::build_get_schema_request(Some(&did), SCHEMA_DATA).unwrap();
+
+        let async_ec = Ledger::parse_get_schema_response_async(&response, cb);
+        assert_eq!(async_ec, ErrorCode::Success, "parse_get_schema_response_async returned {:?}", async_ec);
+
+        let (ec, _, _) = receiver.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_eq!(ec, ErrorCode::Success, "parse_get_schema_response_async returned error_code {:?}", ec);
+    }
+
+    #[test]
+    pub fn parse_get_schema_response_timeout_success() {
+        let wallet = Wallet::new();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+
+        let response = Ledger::build_get_schema_request(Some(&did), SCHEMA_DATA).unwrap();
+
+        match Ledger::parse_get_schema_response_timeout(&response, VALID_TIMEOUT) {
+            Ok(_) => {},
+            Err(ec) => {
+                assert!(false, "parse_get_schema_response_timeout failed with error {:?}", ec);
+            }
+        }
+    }
+
+    #[test]
+    pub fn parse_get_schema_response_timeout_times_out() {
+        let wallet = Wallet::new();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+
+        let response = Ledger::build_get_schema_request(Some(&did), SCHEMA_DATA).unwrap();
+
+        match Ledger::parse_get_schema_response_timeout(&response, INVALID_TIMEOUT) {
+            Ok(_) => {
+                assert!(false, "parse_get_schema_response_timeout failed to TIME OUT");
+            },
+            Err(ec) => {
+                assert_eq!(ec, ErrorCode::CommonIOError, "parse_get_schema_response_timeout failed with error {:?}", ec);
+            }
+        }
+    }
+}
+
+#[cfg(test)]
 mod test_build_get_txn_request {
 
 }
@@ -1117,22 +1346,7 @@ mod test_build_get_ddo_request {
 }
 
 #[cfg(test)]
-mod test_build_schema_request {
-
-}
-
-#[cfg(test)]
-mod test_build_get_schema_request {
-
-}
-
-#[cfg(test)]
 mod test_build_cred_def_request {
-
-}
-
-#[cfg(test)]
-mod test_parse_get_schema_response {
 
 }
 
