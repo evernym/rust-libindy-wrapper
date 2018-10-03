@@ -1222,11 +1222,18 @@ mod test_parse_get_schema_response {
 
     use super::*;
 
-    const SCHEMA_DATA : &str = r#"{"id":"id","attrNames": ["name", "male"],"name":"gvt2","version":"3.1","ver":"1.0"}"#;
+    const SCHEMA_ID : &str = "schema_id1234";
+    const SCHEMA_NAME : &str = "schema_1234";
+    const SCHEMA_DATA : &str = r#"{"id":"schema_id1234","attrNames": ["name", "male"],"name":"schema_1234","version":"1.0","ver":"1.0"}"#;
 
 
-    fn create_build_schema_request(did : &String, key : &String) -> String {
-        format!("{}:2:{}:1.0", did, key)
+    fn create_build_schema_request(did : &String) -> String {
+        format!("{}:2:schema_1234:1.0", did)
+    }
+
+    fn build_schema(did: &String, pool_handle: i32) {
+        let build_schema = Ledger::build_schema_request(&did, SCHEMA_DATA).unwrap();
+        let submit_response = Ledger::submit_request(pool_handle, &build_schema).unwrap();
     }
 
     #[test]
@@ -1242,12 +1249,12 @@ mod test_parse_get_schema_response {
             num_users: 0,
         });
 
-        let schema_request = create_build_schema_request(&did, &"bob".to_string());
-
         let pool_handle = Pool::open_ledger(&setup.pool_name, None).unwrap();
 
-        let schema_response = Ledger::build_get_schema_request(Some(&did), &schema_request).unwrap();
+        build_schema(&did, pool_handle);
+        let schema_request = create_build_schema_request(&did);
 
+        let schema_response = Ledger::build_get_schema_request(Some(&did), &schema_request).unwrap();
         let signed_response = Ledger::sign_request(wallet.handle, &did,&schema_response).unwrap();
         let submit_response = Ledger::submit_request(pool_handle, &signed_response).unwrap();
 
@@ -1265,21 +1272,38 @@ mod test_parse_get_schema_response {
 
     #[test]
     pub fn parse_get_schema_response_async_success() {
+        Pool::set_protocol_version(PROTOCOL_VERSION as usize).unwrap();
+
         let wallet = Wallet::new();
         let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+        let setup = Setup::new(&wallet, SetupConfig {
+            connect_to_pool: false,
+            num_trustees: 0,
+            num_nodes: 4,
+            num_users: 0,
+        });
+
+        let pool_handle = Pool::open_ledger(&setup.pool_name, None).unwrap();
+
+        build_schema(&did, pool_handle);
+        let schema_request = create_build_schema_request(&did);
+
+        let schema_response = Ledger::build_get_schema_request(Some(&did), &schema_request).unwrap();
+        let signed_response = Ledger::sign_request(wallet.handle, &did,&schema_response).unwrap();
+        let submit_response = Ledger::submit_request(pool_handle, &signed_response).unwrap();
 
         let (sender, receiver) = channel();
         let cb = move |ec, s1, s2| {
             sender.send((ec, s1, s2)).unwrap();
         };
 
-        let response = Ledger::build_get_schema_request(Some(&did), SCHEMA_DATA).unwrap();
-
-        let async_ec = Ledger::parse_get_schema_response_async(&response, cb);
-        assert_eq!(async_ec, ErrorCode::Success, "parse_get_schema_response_async returned {:?}", async_ec);
+        let async_ec = Ledger::parse_get_schema_response_async(&submit_response, cb);
 
         let (ec, _, _) = receiver.recv_timeout(Duration::from_secs(5)).unwrap();
-        assert_eq!(ec, ErrorCode::Success, "parse_get_schema_response_async returned error_code {:?}", ec);
+        Pool::close(pool_handle).unwrap();
+
+        assert_eq!(async_ec, ErrorCode::Success, "parse_get_schema_response_async returned {:?}", async_ec);
+        assert_eq!(ec, ErrorCode::Success, "parse_get_schema_response_async failed error_code {:?}", ec);
     }
 
     #[test]
@@ -1316,33 +1340,74 @@ mod test_parse_get_schema_response {
 }
 
 #[cfg(test)]
-mod test_build_get_txn_request {
-
-}
-
-#[cfg(test)]
 mod test_build_get_ddo_request {
+
     use super::*;
 
     #[test]
     pub fn build_get_ddo_request_success() {
-        assert!(false);
+        let wallet = Wallet::new();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+
+        match Ledger::build_get_ddo_request(Some(&did), &did) {
+            Ok(_) => {},
+            Err(ec) => {
+                assert!(false, "build_get_ddo_request failed error_code {:?}", ec);
+            }
+        }
     }
 
     #[test]
     pub fn build_get_ddo_request_async_success() {
-        assert!(false);
+        let wallet = Wallet::new();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+
+        let (sender, receiver) = channel();
+        let cb = move |ec, stuff| {
+            sender.send((ec, stuff)).unwrap();
+        };
+
+        let async_ec = Ledger::build_get_ddo_request_async(Some(&did), &did, cb);
+        assert_eq!(async_ec, ErrorCode::Success, "build_get_ddo_request_async returned {:?}", async_ec);
+
+        let (ec, _) = receiver.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_eq!(ec, ErrorCode::Success, "build_get_ddo_request_async returned error_code {:?}", ec);
+
+
     }
 
     #[test]
     pub fn build_get_ddo_request_timeout_success() {
-        assert!(false);
+        let wallet = Wallet::new();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+
+        match Ledger::build_get_ddo_request_timeout(Some(&did), &did, VALID_TIMEOUT) {
+            Ok(_) => {},
+            Err(ec) => {
+                assert!(false, "build_get_ddo_request_timeout failed error_code {:?}", ec);
+            }
+        }
     }
 
     #[test]
     pub fn build_get_ddo_request_timeout_times_out() {
-        assert!(false);
+        let wallet = Wallet::new();
+        let (did, _) = Did::new(wallet.handle, "{}").unwrap();
+
+        match Ledger::build_get_ddo_request_timeout(Some(&did), &did, INVALID_TIMEOUT) {
+            Ok(_) => {
+                assert!(false, "build_get_ddo_request_timeout failed to timeout");
+            },
+            Err(ec) => {
+                assert_eq!(ec, ErrorCode::CommonIOError, "build_get_ddo_request_timeout failed error_code {:?}", ec);
+            }
+        }
     }
+}
+
+#[cfg(test)]
+mod test_build_get_txn_request {
+
 }
 
 #[cfg(test)]
